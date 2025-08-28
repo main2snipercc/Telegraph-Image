@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegraph-Image 批量上传</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            color: white;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            color: rgba(255,255,255,0.9);
+            font-size: 1.1rem;
+        }
+        
+        .upload-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .upload-area {
+            border: 2px dashed #dcdfe6;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #409eff;
+            background-color: #f8f9ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #409eff;
+            background-color: #f0f9ff;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            color: #c0c4cc;
+            margin-bottom: 16px;
+        }
+        
+        .upload-text {
+            font-size: 16px;
+            color: #606266;
+            margin-bottom: 8px;
+        }
+        
+        .upload-hint {
+            font-size: 14px;
+            color: #909399;
+        }
+        
+        .file-list {
+            margin-top: 20px;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            border: 1px solid #ebeef5;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            background-color: #fafafa;
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .file-name {
+            margin-left: 8px;
+            font-size: 14px;
+            color: #606266;
+        }
+        
+        .file-size {
+            font-size: 12px;
+            color: #909399;
+            margin-left: 8px;
+        }
+        
+        .progress-container {
+            margin-top: 20px;
+        }
+        
+        .result-container {
+            margin-top: 20px;
+        }
+        
+        .result-item {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        
+        .result-success {
+            background-color: #f0f9ff;
+            border: 1px solid #b3d8ff;
+        }
+        
+        .result-error {
+            background-color: #fef0f0;
+            border: 1px solid #fbc4c4;
+        }
+        
+        .back-link {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .back-link:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">← 返回单文件上传</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>批量上传</h1>
+            <p>一次最多上传10个文件，支持图片和视频</p>
+        </div>
+        
+        <div class="upload-card">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">点击选择文件或拖拽文件到此区域</div>
+                <div class="upload-hint">支持 JPG、PNG、GIF、WebP、MP4、WebM、OGG 格式，单文件最大50MB</div>
+                <input type="file" id="fileInput" multiple accept="image/*,video/*" style="display: none;">
+            </div>
+            
+            <div class="file-list" id="fileList" style="display: none;">
+                <h3>选择的文件：</h3>
+                <div id="fileItems"></div>
+            </div>
+            
+            <div class="progress-container" id="progressContainer" style="display: none;">
+                <h3>上传进度：</h3>
+                <div id="progressBar"></div>
+            </div>
+            
+            <div class="result-container" id="resultContainer" style="display: none;">
+                <h3>上传结果：</h3>
+                <div id="resultItems"></div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="uploadBtn" style="display: none;" class="upload-button">开始上传</button>
+                <button id="clearBtn" style="display: none;" class="clear-button">清空列表</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@2"></script>
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <script>
+        class BatchUploader {
+            constructor() {
+                this.files = [];
+                this.isUploading = false;
+                this.initializeElements();
+                this.bindEvents();
+            }
+
+            initializeElements() {
+                this.uploadArea = document.getElementById('uploadArea');
+                this.fileInput = document.getElementById('fileInput');
+                this.fileList = document.getElementById('fileList');
+                this.fileItems = document.getElementById('fileItems');
+                this.uploadBtn = document.getElementById('uploadBtn');
+                this.clearBtn = document.getElementById('clearBtn');
+                this.progressContainer = document.getElementById('progressContainer');
+                this.progressBar = document.getElementById('progressBar');
+                this.resultContainer = document.getElementById('resultContainer');
+                this.resultItems = document.getElementById('resultItems');
+            }
+
+            bindEvents() {
+                // 点击上传区域
+                this.uploadArea.addEventListener('click', () => {
+                    if (!this.isUploading) {
+                        this.fileInput.click();
+                    }
+                });
+
+                // 文件选择
+                this.fileInput.addEventListener('change', (e) => {
+                    this.handleFiles(Array.from(e.target.files));
+                });
+
+                // 拖拽事件
+                this.uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.add('dragover');
+                });
+
+                this.uploadArea.addEventListener('dragleave', () => {
+                    this.uploadArea.classList.remove('dragover');
+                });
+
+                this.uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.remove('dragover');
+                    this.handleFiles(Array.from(e.dataTransfer.files));
+                });
+
+                // 按钮事件
+                this.uploadBtn.addEventListener('click', () => this.startUpload());
+                this.clearBtn.addEventListener('click', () => this.clearFiles());
+            }
+
+            handleFiles(newFiles) {
+                if (this.isUploading) return;
+
+                // 过滤有效文件
+                const validFiles = newFiles.filter(file => {
+                    const isImage = file.type.startsWith('image/');
+                    const isVideo = file.type.startsWith('video/');
+                    return (isImage || isVideo) && file.size <= 50 * 1024 * 1024;
+                });
+
+                if (validFiles.length === 0) {
+                    this.showMessage('没有有效的文件，请选择图片或视频文件（最大50MB）', 'error');
+                    return;
+                }
+
+                // 合并文件列表，限制最大10个
+                this.files = [...this.files, ...validFiles].slice(0, 10);
+                this.updateFileList();
+                
+                if (this.files.length >= 10) {
+                    this.showMessage('最多只能选择10个文件', 'warning');
+                }
+            }
+
+            updateFileList() {
+                if (this.files.length === 0) {
+                    this.fileList.style.display = 'none';
+                    this.uploadBtn.style.display = 'none';
+                    this.clearBtn.style.display = 'none';
+                    return;
+                }
+
+                this.fileList.style.display = 'block';
+                this.uploadBtn.style.display = 'inline-block';
+                this.clearBtn.style.display = 'inline-block';
+
+                this.fileItems.innerHTML = this.files.map((file, index) => `
+                    <div class="file-item">
+                        <div class="file-info">
+                            <span>${file.type.startsWith('image/') ? '🖼️' : '🎥'}</span>
+                            <span class="file-name">${file.name}</span>
+                            <span class="file-size">(${this.formatFileSize(file.size)})</span>
+                        </div>
+                        <button onclick="uploader.removeFile(${index})" style="background: none; border: none; color: #f56c6c; cursor: pointer;">✕</button>
+                    </div>
+                `).join('');
+            }
+
+            removeFile(index) {
+                if (this.isUploading) return;
+                this.files.splice(index, 1);
+                this.updateFileList();
+            }
+
+            clearFiles() {
+                if (this.isUploading) return;
+                this.files = [];
+                this.fileInput.value = '';
+                this.updateFileList();
+                this.hideResults();
+            }
+
+            async startUpload() {
+                if (this.files.length < 2) {
+                    this.showMessage('批量上传至少需要2个文件', 'error');
+                    return;
+                }
+
+                this.isUploading = true;
+                this.showProgress();
+                
+                try {
+                    const formData = new FormData();
+                    this.files.forEach(file => {
+                        formData.append('files', file);
+                    });
+
+                    const response = await fetch('/batch-upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        this.showResults(result, true);
+                        this.showMessage('批量上传成功！', 'success');
+                    } else {
+                        throw new Error(result.error || '上传失败');
+                    }
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    this.showResults([{ error: error.message }], false);
+                    this.showMessage('上传失败：' + error.message, 'error');
+                } finally {
+                    this.isUploading = false;
+                    this.hideProgress();
+                }
+            }
+
+            showProgress() {
+                this.progressContainer.style.display = 'block';
+                this.progressBar.innerHTML = '<div style="text-align: center; padding: 20px;">正在上传，请稍候...</div>';
+                this.uploadBtn.disabled = true;
+                this.clearBtn.disabled = true;
+            }
+
+            hideProgress() {
+                this.progressContainer.style.display = 'none';
+                this.uploadBtn.disabled = false;
+                this.clearBtn.disabled = false;
+            }
+
+            showResults(results, success) {
+                this.resultContainer.style.display = 'block';
+                
+                if (success) {
+                    this.resultItems.innerHTML = results.map(result => `
+                        <div class="result-item result-success">
+                            <strong>✅ ${result.fileName}</strong><br>
+                            <small>链接：<a href="${result.src}" target="_blank">${window.location.origin}${result.src}</a></small><br>
+                            <small>大小：${this.formatFileSize(result.fileSize)}</small>
+                        </div>
+                    `).join('');
+                } else {
+                    this.resultItems.innerHTML = results.map(result => `
+                        <div class="result-item result-error">
+                            <strong>❌ 上传失败</strong><br>
+                            <small>${result.error}</small>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            hideResults() {
+                this.resultContainer.style.display = 'none';
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            showMessage(message, type) {
+                // 简单的消息提示
+                const messageDiv = document.createElement('div');
+                messageDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 12px 20px;
+                    border-radius: 4px;
+                    color: white;
+                    z-index: 1000;
+                    font-size: 14px;
+                    background-color: ${type === 'success' ? '#67c23a' : type === 'error' ? '#f56c6c' : '#e6a23c'};
+                `;
+                messageDiv.textContent = message;
+                document.body.appendChild(messageDiv);
+                
+                setTimeout(() => {
+                    document.body.removeChild(messageDiv);
+                }, 3000);
+            }
+        }
+
+        // 初始化上传器
+        const uploader = new BatchUploader();
+    </script>
+
+    <style>
+        .upload-button, .clear-button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 0 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-button {
+            background-color: #409eff;
+            color: white;
+        }
+        
+        .upload-button:hover:not(:disabled) {
+            background-color: #337ecc;
+        }
+        
+        .upload-button:disabled {
+            background-color: #c0c4cc;
+            cursor: not-allowed;
+        }
+        
+        .clear-button {
+            background-color: #f56c6c;
+            color: white;
+        }
+        
+        .clear-button:hover:not(:disabled) {
+            background-color: #dd4a4a;
+        }
+        
+        .clear-button:disabled {
+            background-color: #c0c4cc;
+            cursor: not-allowed;
+        }
+    </style>
+</body>
+</html>
